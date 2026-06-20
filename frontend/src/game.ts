@@ -21,6 +21,14 @@ import {
 const SNAP_DISTANCE = 35;
 const SAMPLE_INTERVAL = 16;
 
+export interface CompletionInfo {
+  levelName: string;
+  creatureName: string;
+  creatureDescription: string;
+  timeSeconds: number;
+  completionDate: Date;
+}
+
 export class Game {
   private canvas: HTMLCanvasElement;
   private renderer: Renderer;
@@ -31,11 +39,11 @@ export class Game {
   private listeners: Array<() => void> = [];
   private completionTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private levelStartTime: number = 0;
-  private completionTime: number = 0;
+  private completionInfo: CompletionInfo | null = null;
 
   private onLevelChange?: (level: LevelData) => void;
   private onProgressChange?: (current: number, total: number) => void;
-  private onComplete?: (desc: string) => void;
+  private onComplete?: (info: CompletionInfo) => void;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -71,7 +79,7 @@ export class Game {
   setCallbacks(callbacks: {
     onLevelChange?: (level: LevelData) => void;
     onProgressChange?: (current: number, total: number) => void;
-    onComplete?: (desc: string) => void;
+    onComplete?: (info: CompletionInfo) => void;
   }): void {
     this.onLevelChange = callbacks.onLevelChange;
     this.onProgressChange = callbacks.onProgressChange;
@@ -296,12 +304,22 @@ export class Game {
 
     if (current >= total && !this.state.isComplete) {
       this.state.isComplete = true;
-      this.completionTime = performance.now();
+      const nowMs = performance.now();
+      const elapsedSec = Math.max(0, Math.round((nowMs - this.levelStartTime) / 1000));
+      this.completionInfo = {
+        levelName: this.state.levelData.name,
+        creatureName: this.state.levelData.creatureName,
+        creatureDescription: this.state.levelData.creatureDescription,
+        timeSeconds: elapsedSec,
+        completionDate: new Date()
+      };
       if (this.completionTimeoutId) {
         clearTimeout(this.completionTimeoutId);
       }
       this.completionTimeoutId = setTimeout(() => {
-        this.onComplete?.(this.state.levelData!.creatureDescription);
+        if (this.completionInfo) {
+          this.onComplete?.(this.completionInfo);
+        }
         this.completionTimeoutId = null;
       }, 1500);
     }
@@ -343,6 +361,8 @@ export class Game {
       this.completionTimeoutId = null;
     }
 
+    this.completionInfo = null;
+    this.levelStartTime = performance.now();
     this.state.connections = [];
     this.state.completedEdges = new Set();
     this.state.isComplete = false;
@@ -365,6 +385,7 @@ export class Game {
     const data = await getLevel(levelId);
     if (!data) return false;
 
+    this.completionInfo = null;
     this.state.currentLevel = levelId;
     this.state.levelData = data;
     this.state.connections = [];
@@ -375,7 +396,6 @@ export class Game {
     this.state.snapTargetId = null;
     this.state.showFrequencies = false;
     this.levelStartTime = performance.now();
-    this.completionTime = 0;
 
     this.onLevelChange?.(data);
     this.onProgressChange?.(0, data.edges.length);
@@ -387,22 +407,8 @@ export class Game {
     return this.state.currentLevel;
   }
 
-  getCompletionData(): {
-    levelName: string;
-    creatureName: string;
-    creatureDescription: string;
-    timeSeconds: number;
-    completionDate: Date;
-  } | null {
-    if (!this.state.levelData || !this.state.isComplete) return null;
-    const elapsed = this.completionTime > 0 ? (this.completionTime - this.levelStartTime) / 1000 : 0;
-    return {
-      levelName: this.state.levelData.name,
-      creatureName: this.state.levelData.creatureName,
-      creatureDescription: this.state.levelData.creatureDescription,
-      timeSeconds: Math.round(elapsed),
-      completionDate: new Date()
-    };
+  getCompletionData(): CompletionInfo | null {
+    return this.completionInfo;
   }
 
   getCanvas(): HTMLCanvasElement {

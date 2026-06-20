@@ -1,4 +1,5 @@
 import { Game } from './game';
+import type { CompletionInfo } from './game';
 import type { LevelData } from './types';
 import { healthCheck } from './api';
 import { PostcardExporter } from './postcard';
@@ -16,6 +17,7 @@ const hintTextEl = document.getElementById('hint-text')!;
 const completeModal = document.getElementById('complete-modal')!;
 const modalTitleEl = document.getElementById('modal-title')!;
 const modalDescEl = document.getElementById('modal-desc')!;
+const modalMetaEl = document.getElementById('modal-meta')!;
 
 const btnUndo = document.getElementById('btn-undo') as HTMLButtonElement;
 const btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
@@ -59,12 +61,17 @@ game.setCallbacks({
       }
     }
   },
-  onComplete: (desc: string) => {
+  onComplete: (info: CompletionInfo) => {
     hintTitleEl.textContent = '✨ 星座完成 ✨';
     hintTextEl.textContent = '星界神话生物已显现！仔细欣赏它的光辉吧';
 
-    modalTitleEl.textContent = `✨ ${creatureNameEl.textContent} 降临 ✨`;
-    modalDescEl.textContent = desc;
+    modalTitleEl.textContent = `✨ ${info.creatureName} 降临 ✨`;
+    modalDescEl.textContent = info.creatureDescription;
+
+    const timeStr = formatTime(info.timeSeconds);
+    const dateStr = formatDate(info.completionDate);
+    modalMetaEl.textContent = `⏱ 用时：${timeStr}　📅 ${dateStr}`;
+
     completeModal.classList.add('show');
 
     if (game.getCurrentLevel() >= MAX_LEVELS) {
@@ -159,6 +166,24 @@ async function init(): Promise<void> {
   }
 
   game.start();
+}
+
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  if (mins > 0) {
+    return `${mins}分${secs}秒`;
+  }
+  return `${secs}秒`;
+}
+
+function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}年${month}月${day}日 ${hours}:${minutes}`;
 }
 
 init().catch(err => {
