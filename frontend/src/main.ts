@@ -1,6 +1,7 @@
 import { Game } from './game';
 import type { LevelData } from './types';
 import { healthCheck } from './api';
+import { PostcardExporter } from './postcard';
 
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const game = new Game(canvas);
@@ -20,6 +21,8 @@ const btnUndo = document.getElementById('btn-undo') as HTMLButtonElement;
 const btnReset = document.getElementById('btn-reset') as HTMLButtonElement;
 const btnHint = document.getElementById('btn-hint') as HTMLButtonElement;
 const btnNext = document.getElementById('btn-next') as HTMLButtonElement;
+const btnExport = document.getElementById('btn-export') as HTMLButtonElement;
+const exportStatus = document.getElementById('export-status')!;
 
 const MAX_LEVELS = 3;
 
@@ -95,6 +98,44 @@ btnNext.addEventListener('click', async () => {
   completeModal.classList.remove('show');
   btnHint.textContent = '显示频率';
   await game.loadLevel(nextLevel);
+});
+
+btnExport.addEventListener('click', async () => {
+  const data = game.getCompletionData();
+  if (!data) {
+    alert('请先完成本关后再导出明信片');
+    return;
+  }
+
+  try {
+    btnExport.disabled = true;
+    exportStatus.style.display = 'block';
+    exportStatus.textContent = '正在生成明信片...';
+
+    const postcard = await PostcardExporter.createPostcard({
+      ...data,
+      canvas: game.getCanvas()
+    });
+
+    const filename = `星座明信片_${data.creatureName}_${data.completionDate.getFullYear()}${String(data.completionDate.getMonth() + 1).padStart(2, '0')}${String(data.completionDate.getDate()).padStart(2, '0')}.png`;
+    
+    PostcardExporter.downloadPostcard(postcard, filename);
+    
+    exportStatus.textContent = '✨ 明信片已生成，正在下载...';
+    setTimeout(() => {
+      exportStatus.style.display = 'none';
+      btnExport.disabled = false;
+    }, 3000);
+  } catch (err) {
+    console.error('导出失败:', err);
+    exportStatus.textContent = '导出失败，请重试';
+    exportStatus.style.color = '#ff6b6b';
+    setTimeout(() => {
+      exportStatus.style.display = 'none';
+      exportStatus.style.color = '#a0c4ff';
+      btnExport.disabled = false;
+    }, 3000);
+  }
 });
 
 async function init(): Promise<void> {

@@ -30,6 +30,8 @@ export class Game {
   private animationFrameId: number = 0;
   private listeners: Array<() => void> = [];
   private completionTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private levelStartTime: number = 0;
+  private completionTime: number = 0;
 
   private onLevelChange?: (level: LevelData) => void;
   private onProgressChange?: (current: number, total: number) => void;
@@ -294,6 +296,7 @@ export class Game {
 
     if (current >= total && !this.state.isComplete) {
       this.state.isComplete = true;
+      this.completionTime = performance.now();
       if (this.completionTimeoutId) {
         clearTimeout(this.completionTimeoutId);
       }
@@ -371,6 +374,8 @@ export class Game {
     this.state.drawState = this.createEmptyDrawState();
     this.state.snapTargetId = null;
     this.state.showFrequencies = false;
+    this.levelStartTime = performance.now();
+    this.completionTime = 0;
 
     this.onLevelChange?.(data);
     this.onProgressChange?.(0, data.edges.length);
@@ -380,6 +385,28 @@ export class Game {
 
   getCurrentLevel(): number {
     return this.state.currentLevel;
+  }
+
+  getCompletionData(): {
+    levelName: string;
+    creatureName: string;
+    creatureDescription: string;
+    timeSeconds: number;
+    completionDate: Date;
+  } | null {
+    if (!this.state.levelData || !this.state.isComplete) return null;
+    const elapsed = this.completionTime > 0 ? (this.completionTime - this.levelStartTime) / 1000 : 0;
+    return {
+      levelName: this.state.levelData.name,
+      creatureName: this.state.levelData.creatureName,
+      creatureDescription: this.state.levelData.creatureDescription,
+      timeSeconds: Math.round(elapsed),
+      completionDate: new Date()
+    };
+  }
+
+  getCanvas(): HTMLCanvasElement {
+    return this.canvas;
   }
 
   start(): void {
